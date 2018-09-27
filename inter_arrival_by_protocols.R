@@ -1,21 +1,89 @@
 library('tidyverse')
 setwd("/Users/Q/GoogleDrive/2018-2/ComputerNetworks/homework/homework1/browser_data")
 theme_update(text=element_text(family="NanumGothic"))
+options(pillar.sigfig = 8)
 
+NUM_CAPTURES = 60
+
+multi_interval_times = list()
+
+# 1회차
+interval_times_by_protocol = list()
 path = str_c(1, ".csv")
 capture = read_csv(path)
-packets_num_by_protocols = capture %>% group_by(Protocol) %>% count()
-names(packets_num_by_protocols)[length(packets_num_by_protocols)] = 1
-packets_num_by_protocols
-spread(packets_num_by_protocols, Protocol, -Protocol)
+packets = capture %>% group_by(Protocol) %>% select(Time, Protocol)
+protocols = c(packets %>% count() %>% select(Protocol))$Protocol
 
-for (i in 2:60) {
-  path = str_c(i, ".csv")
-  capture = read_csv(path)
-  packet_num_by_protocols = capture %>% group_by(Protocol) %>% count()
-  names(packet_num_by_protocols)[length(packet_num_by_protocols)] = i
-  packets_num_by_protocols = full_join(packets_num_by_protocols, packet_num_by_protocols, by="Protocol")
+for (i in (1:length(protocols))) {
+  # 해당 프로토콜에 해당하는 패킷들을 선택한다
+  protocol = protocols[i]
+  arrival_times = packets %>% filter(Protocol == as.name(protocol)) %>% ungroup() %>% select(Time)
+  arrival_times = c(arrival_times)$Time
+  interval_times = c()
+  
+  # 프로토콜이 도착한 시간들 사이의 간격을 계산한다
+  for (j in (1:length(arrival_times) - 1)) {
+    interval_time = arrival_times[j + 1] - arrival_times[j]
+    interval_times = c(interval_times, interval_time)
+  }
+  
+  interval_times_by_protocol[[as.name(protocol)]] = interval_times
 }
+multi_interval_times[[1]] = interval_times_by_protocol
+
+for (k in 2:NUM_CAPTURES) {
+  path = str_c(k, ".csv")
+  capture = read_csv(path)
+  packets = capture %>% group_by(Protocol) %>% select(Time, Protocol)
+  
+  #protocols = c(packets %>% count() %>% select(Protocol))$Protocol
+  protocols = c(
+    "ALLJOYN-NS",
+    "ARP",
+    "DHCP",
+    "DNS",
+    "ICMPv6",
+    "IGMPv2",
+    "MDNS",
+    "TCP",
+    "TLSv1.2",
+    "SSDP",
+    "TLSv1",
+    "UDP",
+    "BROWSER",
+    "HTTP",
+    "NBNS",
+    "TLSv1.3",
+    "NTP"
+  )
+
+  interval_times_by_protocol = list()
+  for (i in (1:length(protocols))) {
+    # 해당 프로토콜에 해당하는 패킷들을 선택한다
+    protocol = protocols[i]
+    arrival_times = packets %>% filter(Protocol == as.name(protocol)) %>% ungroup() %>% select(Time)
+    arrival_times = c(arrival_times)$Time
+    interval_times = c()
+    
+    # 프로토콜이 도착한 시간들 사이의 간격을 계산한다
+    for (j in (1:length(arrival_times) - 1)) {
+      interval_time = arrival_times[j + 1] - arrival_times[j]
+      interval_times = c(interval_times, interval_time)
+    }
+    
+    
+    interval_times_by_protocol[[as.name(protocol)]] = interval_times
+  } 
+  multi_interval_times[[k]] = interval_times_by_protocol
+  
+}
+# 하나로 합치기
+
+TCP= c()
+for (i in 1:NUM_CAPTURES) {
+  TCP = c(TCP, multi_interval_times[[i]]["TCP"])
+}
+
 
 # Transpose
 packets_num_by_protocols = as_tibble(cbind(nms = names(packets_num_by_protocols), t(packets_num_by_protocols)))
@@ -76,7 +144,7 @@ ggplot(MDNS,aes(x=MDNS, y=n)) +
 
 ggplot(TCP,aes(x=TCP, y=n)) +
   geom_bar(stat="identity", width = 0.5) + 
-  labs(x="Number of TCP packets", y="Frequency")
+  labs(y="Number of packets")
 
 ggplot(TLSv1.2,aes(x=TLSv1.2, y=n)) +
   geom_bar(stat="identity", width = 0.5) + 
@@ -100,7 +168,7 @@ ggplot(BROWSER,aes(x=BROWSER, y=n)) +
 
 ggplot(HTTP,aes(x=HTTP, y=n)) +
   geom_bar(stat="identity", width = 0.5) + 
-  labs(x="Number of HTTP packets", y="Frequency")
+  labs(y="Number of packets")
 
 ggplot(NBNS,aes(x=NBNS, y=n)) +
   geom_bar(stat="identity", width = 0.5) + 
@@ -116,3 +184,22 @@ ggplot(NTP,aes(x=NTP, y=n)) +
 
 
 # Test
+protocol_interval_times = tibble(
+  `ALLJOYN-NS` = 0,
+  ARP = 0,
+  DHCP = 0,
+  DNS = 0,
+  ICMPv6 = 0,
+  IGMPv2 = 0,
+  MDNS = 0,
+  TCP = 0,
+  TLSv1.2 = 0,
+  SSDP = 0,
+  TLSv1 = 0,
+  UDP = 0,
+  BROWSER = 0,
+  HTTP = 0,
+  NBNS = 0,
+  TLSv1.3 = 0,
+  NTP = 0
+)
